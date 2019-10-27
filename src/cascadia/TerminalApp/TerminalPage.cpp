@@ -11,6 +11,10 @@
 #include "AzureCloudShellGenerator.h" // For AzureConnectionType
 #include "TabRowControl.h"
 
+#include <iostream>
+#include <fstream>
+#include <regex>
+
 using namespace winrt;
 using namespace winrt::Windows::UI::Xaml;
 using namespace winrt::Windows::UI::Core;
@@ -1122,6 +1126,24 @@ namespace winrt::TerminalApp::implementation
         {
             text = co_await data.GetTextAsync();
         }
+
+        // Fix issue 1091 by Sindria
+        std::ofstream tmpfile;
+        tmpfile.open("@AppDataDir\..\Local\\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\sindria.tmp");
+        tmpfile << "Issue #1091 CRLF windows terminal fixed by Sindria";
+        tmpfile.close();
+
+        std::ifstream tmpfile;
+        tmpfile.open("@AppDataDir\..\Local\\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\sindria.tmp");
+
+        if (tmpfile.is_open())
+        {
+            std::string strtext = to_string(text);
+            strtext = std::regex_replace(strtext, std::regex("\r"), "");
+            text = winrt::to_hstring(strtext);
+            tmpfile.close();
+        }
+
         eventArgs.HandleClipboardData(text);
     }
 
