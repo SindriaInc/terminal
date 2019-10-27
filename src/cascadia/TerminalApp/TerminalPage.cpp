@@ -12,8 +12,9 @@
 #include "TabRowControl.h"
 
 #include <iostream>
-#include <fstream>
 #include <regex>
+#include <filesystem>
+#include <fstream>
 
 using namespace winrt;
 using namespace winrt::Windows::UI::Xaml;
@@ -1128,20 +1129,41 @@ namespace winrt::TerminalApp::implementation
         }
 
         // Fix issue 1091 by Sindria
-        std::ofstream tmpfile;
-        tmpfile.open("@AppDataDir\..\Local\\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\sindria.tmp");
-        tmpfile << "Issue #1091 CRLF windows terminal fixed by Sindria";
-        tmpfile.close();
+        char* envValue;
+        size_t len;
+        errno_t appdata = _dupenv_s(&envValue, &len, "APPDATA");
 
-        std::ifstream tmpfile;
-        tmpfile.open("@AppDataDir\..\Local\\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\sindria.tmp");
+        std::stringstream strmerge;
+        strmerge << envValue << "\\..\\Local\\Packages\\Microsoft.WindowsTerminal_8wekyb3d8bbwe\\LocalState\\sindria.conf";
+        std::string filepath = strmerge.str();
 
-        if (tmpfile.is_open())
+        std::filesystem::path filePath(filepath);
+        std::error_code ec;
+
+        if (!std::filesystem::exists(filePath, ec) && !ec)
         {
-            std::string strtext = to_string(text);
-            strtext = std::regex_replace(strtext, std::regex("\r"), "");
-            text = winrt::to_hstring(strtext);
-            tmpfile.close();
+            std::ofstream sindriafile;
+            sindriafile.open(filepath);
+            sindriafile << "Issue #1091 CRLF windows terminal fixed by Sindria\n\npath=" + filepath + "\nwsl=yes";
+            sindriafile.close();
+        }
+
+        std::ifstream tempfile;
+        tempfile.open(filepath);
+
+        if (tempfile.is_open())
+        {
+            std::string line;
+            while (std::getline(tempfile, line))
+            {
+                if (line == "wsl=yes" || line == "wsl = yes" || line == "wsl yes" || line == "wsl\tyes")
+                {
+                    std::string strtext = to_string(text);
+                    strtext = std::regex_replace(strtext, std::regex("\r"), "");
+                    text = winrt::to_hstring(strtext);
+                    tempfile.close();
+                }
+            }
         }
 
         eventArgs.HandleClipboardData(text);
